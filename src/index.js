@@ -44,6 +44,37 @@ function generateTrackingId() {
     return crypto.randomBytes(16).toString('hex')
 }
 
+// Helper function to get BASE_URL (auto-detects Render or uses env variable)
+function getBaseUrl() {
+    // Priority 1: Explicitly set BASE_URL in environment
+    if (process.env.BASE_URL) {
+        return process.env.BASE_URL
+    }
+    
+    // Priority 2: Render provides RENDER_EXTERNAL_URL
+    if (process.env.RENDER_EXTERNAL_URL) {
+        return process.env.RENDER_EXTERNAL_URL
+    }
+    
+    // Priority 3: Construct from Render service name
+    if (process.env.RENDER_SERVICE_NAME) {
+        return `https://${process.env.RENDER_SERVICE_NAME}.onrender.com`
+    }
+    
+    // Priority 4: Check if PORT is set (common in cloud platforms)
+    if (process.env.PORT) {
+        // Try to get from request if available, otherwise use localhost
+        return `http://localhost:${process.env.PORT}`
+    }
+    
+    // Fallback: localhost for local development
+    return 'http://localhost:3000'
+}
+
+// Get and log BASE_URL at startup
+const baseUrl = getBaseUrl()
+console.log(`🌐 BASE_URL detected: ${baseUrl}`)
+
 // Tracking endpoint for email opens (1x1 pixel)
 app.get('/track/open/:trackingId', async (req, res) => {
     const { trackingId } = req.params
@@ -211,7 +242,7 @@ app.post('/send-emails', async (req, res) => {
                 try {
                     // Generate unique tracking ID for this email
                     const trackingId = generateTrackingId()
-                    const baseUrl = process.env.BASE_URL || `http://localhost:3000`
+                    const baseUrl = getBaseUrl()
                     
                     // Extract links from the template and create tracking links
                     const links = []
@@ -343,7 +374,14 @@ app.post('/send-emails', async (req, res) => {
 })
 
 // Start server after all routes are defined
-app.listen(3000, () => {
-    console.log("Server is running on port 3000")
+const PORT = process.env.PORT || 3000
+app.listen(PORT, () => {
+    console.log(`🚀 Server is running on port ${PORT}`)
+    console.log(`🌐 BASE_URL: ${baseUrl}`)
+    if (useMongoDB) {
+        console.log(`✅ Using MongoDB for tracking storage`)
+    } else {
+        console.log(`⚠️  Using in-memory storage (data will be lost on restart)`)
+    }
 })
 
